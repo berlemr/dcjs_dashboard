@@ -1,0 +1,366 @@
+<html lang="EN">
+
+	<head>
+		<meta charset="utf-8">
+		<title>Dashboard Central Metrics</title>
+		<link rel="stylesheet" type="text/css" href="dc.css" />  <!-- you need this to style the dc charts-->
+		<style>
+		
+			h1,h2 {
+			text-align: center;
+			color: white;
+			}
+			
+			table {
+				border-collapse: collapse;
+				margin: 0 auto;
+				margin-top: 45px;	
+			}
+
+			table thead tr,
+			table tbody tr {
+				border-bottom: 1px solid gainsboro;
+				line-height: 2;
+			}
+
+			table tbody tr:hover {
+				background-color: lightblue;
+				cursor: pointer;
+			}
+
+			table thead tr {
+				border-top: 1px solid gainsboro;
+				background-color: steelblue;
+				line-height: 2;
+				color: white;
+			}
+
+			table tbody tr td,
+			table thead tr td {
+				/*width: 100%;*/
+				text-align: center;
+			}
+			
+			td.dc-table-column._2,
+			td.dc-table-column._4{
+				width: 25%;
+			}
+	
+			#pie2 svg g g.pie-label-group{
+				display: none;
+			}
+
+			#barchart2 svg g g.axis.x g.tick{
+				display: none;
+			}
+			
+			div.row {
+				display: block;
+				height: 67%;
+				width: 100%;
+				margin-top:2px;
+				margin-bottom: 2px;
+				margin-right:2px;
+				margin-left:2px;
+				border:1px solid yellow;
+			}		
+
+			div.row_2 {
+				display: block;
+				height: 33%;
+				width: 100%;
+				margin-top:2px;
+				margin-bottom: 2px;
+				margin-right:2px;
+				margin-left:2px;
+				border:1px solid yellow;			}		
+			
+			div.column {
+			  width: 49%;
+			  height: 99%;
+			  display: block;
+			  float: left;
+			  margin-top:2px;
+			  margin-bottom: 2px;
+			  margin-right:2px;
+			  margin-left:2px;
+			  border:1px solid black;
+			}
+
+			
+			div.subColumn {
+			  display: block;
+			  height: 40%;
+			  width: 49%;
+			  float: left;
+			  margin-top:30px;
+			  /*margin-bottom: 2px;*/
+			  margin-right:2px;
+			  margin-left:2px;
+			  border:1px solid red;
+			}
+			
+			div.subRow {
+			  display: block;
+			  height: 50%;
+			  width: 100%;
+			  float: left;
+			  margin-top:2px;
+			  margin-bottom: 2px;
+			  margin-right:2px;
+			  margin-left:2px;
+			  border:1px solid blue;
+			}
+			
+		</style>
+	</head>
+	
+	<body bgcolor='grey'>
+
+		<div class="row">
+				<div class="column">
+					<div class="subRow" id ='barchart1'></div>
+					<div class="subColumn" id='row-chart1'><h2>MTD</h2></div>
+					<div class="subColumn" id='row-chart2'><h2>PriorDay</h2></div>
+				</div>
+				<div class="column" id ='bubble'></div>
+		</div>
+		<div class="row_2">
+			<div class="column" id ='barchart2'></div>
+			<div class="column">
+				<div class="column" id='pie1'></div>
+				<div class="column"><div class='dc-data-count'></div></div>
+			</div>
+		</div>
+		
+		<script type="text/javascript" src="d3.js"></script>
+		<script type="text/javascript" src="crossfilter.js"></script>
+		<script type="text/javascript" src="dc.js"></script>
+		<script type="text/javascript" src="colorbrewer.js"></script>
+		
+		<script type="text/javascript">
+			
+			d3.csv("rev_data.csv",function(data){
+			
+				function print_filter(filter) {
+					var f=eval(filter);
+					if (typeof(f.length) != "undefined") {}else{}
+					if (typeof(f.top) != "undefined") {f=f.top(Infinity);}else{}
+					if (typeof(f.dimension) != "undefined") {f=f.dimension(function(d) { return "";}).top(Infinity);}else{}
+					console.log(filter+"("+f.length+") = "+JSON.stringify(f).replace("[","[\n\t").replace(/}\,/g,"},\n\t").replace("]","\n]"));
+				};
+				
+				data.forEach(function(d){
+					d.INTRADAY = +(d.INTRADAY.replace(/,/g,''));
+					d.PRIORDAY = +(d.PRIORDAY.replace(/,/g,''));
+					d.PRIORMONTH = +(d.PRIORMONTH.replace(/,/g,''));
+					d.MTD = +(d.MTD.replace(/,/g,''));
+					d.YTD = +(d.YTD.replace(/,/g,''));
+				});
+				
+				facts = crossfilter(data)
+				all = facts.groupAll()
+				
+				var totals = all.reduce(
+						function(p, v) {
+							p.total_intra += v.INTRADAY;
+							p.total_prior_mth += v.PRIORMONTH;
+							p.total_prior_day += v.PRIORDAY;
+							return p;
+						},
+						function(p, v) {
+							p.total_intra -= 1;
+							p.total_prior_mth -= 1;
+							p.total_prior_day -= 1;
+							return p;
+						},
+						function() {
+							return {total_intra: 0, total_prior_mth: 0, total_prior_day:0 };
+						}
+					).value();
+				
+				console.log(totals.total_intra)
+				console.log(totals.total_prior_mth)
+				console.log(totals.total_prior_day)
+				
+				//dimensions
+				var revDimension = facts.dimension(function(d){return d.REVENUE_TYPE;});
+				var revGroup = revDimension.group().reduceSum(function(d){return d.YTD;});
+				
+				var productDimension = facts.dimension(function(d){return d.PRODUCT_TYPE;});
+				var productGroup = productDimension.group().reduceSum(function(d){return d.INTRADAY;});
+				
+				var clientDimension = facts.dimension(function(d){return d.CLIENT;});
+				var clientGroup = clientDimension.group().reduceSum(function(d){return d.YTD;});
+
+				var leDimension = facts.dimension(function(d){return d.LEGAL_ENTITY;});
+				var le_ytd_Group = leDimension.group().reduceSum(function(d){return d.YTD;});
+				var le_mtd_Group = leDimension.group().reduceSum(function(d){return d.MTD;});
+				var le_prior_day_Group = leDimension.group().reduceSum(function(d){return d.PRIORDAY;});
+				
+				
+				var scatterDimension = facts.dimension(function(d){ return d.CLIENT; });
+				var scatterGroup = scatterDimension.group().reduce(
+						function(p,v){
+							p.intraday += v.INTRADAY
+							p.priorday += v.PRIORDAY
+							p.priormonth += v.PRIORMONTH
+							return p
+						},
+						function(p,v){
+							p.intraday -= v.INTRADAY
+							p.priorday -= v.PRIORDAY
+							p.priormonth -= v.PRIORMONTH
+							return p
+						},
+						function(){
+							return{intraday:0,priorday:0,priormonth:0}
+						}
+					);
+				
+				print_filter(scatterGroup)
+				
+				/*var metricArrayGroup = metricDimension.group().reduce(
+					  function(i,d){ i.push(d.MetricValue); return i; },
+					  function(i,d){ i.splice(i.indexOf(d.MetricValue),1); return i; },
+					  function(){ return []; }
+					);
+				*/
+				
+				
+				
+				var dataCount = dc.dataCount(".dc-data-count")
+					.dimension(facts)
+					.group(all)
+					.html({
+					some: '<strong>%filter-count</strong> of <strong>%total-count</strong> records | <a href="\javascript:dc.filterAll(); dc.renderAll();\">Reset All</a>',
+					all: 'All records selected. Please click on the graph to apply filters.'
+				  });
+
+				
+				var pieChart1 = dc.pieChart("#pie1")
+					.width(400)
+					.height(350)
+					.radius(120)
+					.colors(d3.scale.category10())
+					.transitionDuration(1500) //speed of animation
+					.dimension(productDimension)
+					.group(productGroup)
+					.legend(dc.legend().x(300).y(5).itemHeight(12).gap(5))
+					;
+				
+				var le_ytd = dc.rowChart('#row-chart1')
+					//.width(400)
+					.height(200)
+					.margins({top: 20, left: 10, right: 10, bottom: 20})
+					.group(le_ytd_Group)
+					.dimension(leDimension)
+					.ordinalColors(['#3182bd', '#6baed6', '#9ecae1', '#c6dbef', '#dadaeb'])
+					.label(function (d) {return d.key;})
+					.title(function (d) {return d.value;})
+					.elasticX(true)
+					.xAxis().ticks(4);
+				
+				var le_mtd = dc.rowChart('#row-chart2')
+					//.width(400)
+					.height(200)
+					.margins({top: 20, left: 10, right: 10, bottom: 20})
+					.group(le_prior_day_Group)
+					.dimension(leDimension)
+					.ordinalColors(['#3182bd', '#6baed6', '#9ecae1', '#c6dbef', '#dadaeb'])
+					.label(function (d) {return d.key;})
+					.title(function (d) {return d.value;})
+					.elasticX(true)
+					.xAxis().ticks(4);
+
+				
+				
+				var barChart1 = dc.barChart("#barchart1")
+					.width(850)
+					.height(400)
+					.margins({top:20,bottom:50,right:80,left:60})
+					.dimension(revDimension)
+					.group(revGroup)
+					.x(d3.scale.ordinal())
+					.colors(d3.scale.ordinal().domain(["positive","negative"])
+						.range(["blue","red"]))
+					.colorAccessor(function(d) { 
+						if(d.value >0) 
+							return "positive"
+						return "negative";})
+					.yAxisPadding(5)
+					.elasticY(true)
+					.xUnits(dc.units.ordinal)
+					.renderHorizontalGridLines(true)
+					//.outerPadding(0.05)
+					;
+					
+				barChart1.yAxis().ticks(5);
+
+				var barChart2 = dc.barChart("#barchart2")
+					.width(1000)
+					.height(350)
+					.margins({top:20,bottom:40,right:80,left:60})
+					.dimension(clientDimension)
+					.group(clientGroup)
+					.x(d3.scale.ordinal())
+					.xUnits(dc.units.ordinal)
+					//.elasticY(true)
+					.outerPadding(0.05)
+					.renderHorizontalGridLines(true)
+					.on('renderlet',function(chart){chart.selectAll("g.x text").attr('transform',"translate(-20,50)rotate(270)");})
+					;
+				
+				barChart2.yAxis().ticks(5);				
+				
+				var bubble = dc.bubbleChart("#bubble")
+					.width(1000)
+					.height(700)
+					.margins({top:40,bottom:60,right:80,left:60})
+					.dimension(scatterDimension)
+					.group(scatterGroup)
+					// .stack(dateGroupTip,"tip")
+					// .yAxisLabel("Transaction spend")
+					.renderHorizontalGridLines(true)
+					.renderVerticalGridLines(true)
+					// .renderArea(true)
+					// .legend(dc.legend().x(1200).y(5).itemHeight(12).gap(5))
+					// .symbolSize(20)
+					.clipPadding(70)
+					// .symbol('cross')
+					//.colorAccessor(function(d){ return d.key[0]; })
+					.colors(colorbrewer.RdPu[6]).colorDomain([0,5000])
+					//.keyAccessor(function(d){ return d.key[0]; })
+					.keyAccessor(function(d){ return d.value.priorday; })
+					//.valueAccessor(function(d){ return d.key[1]; })
+					.valueAccessor(function(d){ return d.value.priormonth ; })
+					//.radiusValueAccessor(function(d){ return d.value; })
+					.radiusValueAccessor(function(d){ return d.value.intraday; })
+					.maxBubbleRelativeSize(0.2)
+					//.yAxisLabel("Tip size")
+					//.title(function(d){ return 'x: '+d.key[0]+', y: '+d.key[1]+', val: '+d.value; })
+					.r(d3.scale.linear().domain([0,10000]))
+					.y(d3.scale.linear().domain([0,600000]))
+					.x(d3.scale.linear().domain([0,15000]))
+					//.elasticX(true)
+					.elasticY(true)
+					;
+					// .centerBar(true)
+					//.xUnits(dc.units.fp.precision(100));
+					// .barPadding(0.2)
+					// .outerPadding(0)
+					bubble.yAxis().ticks(5)
+					// lineChart.xAxis().ticks(4);
+					;
+
+				dc.renderAll();
+
+			
+			});
+			
+		</script>
+	
+	
+	</body>
+	
+</html>

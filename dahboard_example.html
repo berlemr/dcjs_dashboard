@@ -1,0 +1,392 @@
+<html lang="EN">
+
+	<head>
+		<meta charset="utf-8">
+		<title>Dashboard Central Metrics</title>
+		<link rel="stylesheet" type="text/css" href="dc.css" />  <!-- you need this to style the dc charts-->
+		<style>
+		
+			h1 {
+			text-align: center;
+			color: white;
+			}
+			
+			
+			table {
+				border-collapse: collapse;
+				margin: 0 auto;
+				margin-top: 45px;	
+			}
+
+			table thead tr,
+			table tbody tr {
+				border-bottom: 1px solid gainsboro;
+				line-height: 2;
+			}
+
+			table tbody tr:hover {
+				background-color: lightblue;
+				cursor: pointer;
+			}
+
+			table thead tr {
+				border-top: 1px solid gainsboro;
+				background-color: steelblue;
+				line-height: 2;
+				color: white;
+			}
+
+			table tbody tr td,
+			table thead tr td {
+				/*width: 100%;*/
+				text-align: center;
+			}
+			
+			td.dc-table-column._2,
+			td.dc-table-column._4{
+				width: 25%;
+			}
+	
+			#pie2 svg g g.pie-label-group{
+				display: none;
+			}
+			
+			div.row {
+				display: block;
+				height: 67%;
+				width: 100%;
+				margin-top:2px;
+				margin-bottom: 2px;
+				margin-right:2px;
+				margin-left:2px;
+				/*border:1px solid yellow;*/
+			}		
+
+			div.row_2 {
+				display: block;
+				height: 33%;
+				width: 100%;
+				margin-top:2px;
+				margin-bottom: 2px;
+				margin-right:2px;
+				margin-left:2px;
+				/*border:1px solid yellow;*/
+			}		
+			
+			div.column {
+			  width: 49%;
+			  height: 99%;
+			  display: block;
+			  float: left;
+			  margin-top:2px;
+			  margin-bottom: 2px;
+			  margin-right:2px;
+			  margin-left:2px;
+			  border:1px solid black;
+			}
+
+			
+			div.subColumn {
+			  display: block;
+			  height: 40%;
+			  width: 49%;
+			  float: left;
+			  margin-top:30px;
+			  /*margin-bottom: 2px;*/
+			  margin-right:2px;
+			  margin-left:2px;
+			  /*border:1px solid red;*/
+			}
+			
+			div.subRow {
+			  display: block;
+			  height: 50%;
+			  width: 100%;
+			  float: left;
+			  margin-top:2px;
+			  margin-bottom: 2px;
+			  margin-right:2px;
+			  margin-left:2px;
+			  /*border:1px solid blue;*/
+			}
+			
+		</style>
+	</head>
+	
+	<body bgcolor='grey'>
+
+		<div class="row">
+				<div class="column">
+					<div class="subRow" id='pie2'></div>
+					<div class="subColumn" id='row-chart1'></div>
+					<div class="subColumn" id='row-chart2'></div>
+				</div>
+				<div class="column">
+					<div class="subRow" id='chart'>
+						<span class="reset" style="display: none;">Range: <span class="filter"></span></span>
+						<a class="reset" style="display:none" href="javascript:lineChart.filterAll(); dc.redrawAll();">reset</a>
+					</div>
+					<div class="subRow" id ='barchart1'></div>
+				</div>
+		</div>
+		<div class="row_2">
+			<div class="column" id ='barchart2'></div>
+			<div class="column">
+				<div class="column" id='pie1'></div>
+				<div class="column">
+					<div id='selector'></div>
+					<div class='dc-data-count'></div>
+				</div>
+			</div>
+		</div>
+		
+		<script type="text/javascript" src="d3.js"></script>
+		<script type="text/javascript" src="crossfilter.js"></script>
+		<script type="text/javascript" src="dc.js"></script>
+		<script type="text/javascript" src="colorbrewer.js"></script>
+		<script type="text/javascript" src="selecta.js"></script>
+		
+		<script type="text/javascript">
+			
+			d3.csv("d3_input.csv",function(data){
+			
+				function print_filter(filter) {
+					var f=eval(filter);
+					if (typeof(f.length) != "undefined") {}else{}
+					if (typeof(f.top) != "undefined") {f=f.top(Infinity);}else{}
+					if (typeof(f.dimension) != "undefined") {f=f.dimension(function(d) { return "";}).top(Infinity);}else{}
+					console.log(filter+"("+f.length+") = "+JSON.stringify(f).replace("[","[\n\t").replace(/}\,/g,"},\n\t").replace("]","\n]"));
+				};
+			
+				mths = {0:'Jan',1:'Feb',2:'Mar',3:'Apr',4:'May',5:'Jun',6:'Jul',7:'Aug',8:'Sep',9:'Oct',10:'Nov',11:'Dec'};
+				dow = {0:'Sun',1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat'};
+				
+				data.forEach(function(d){
+					d.dd = new Date(d.StartDate);
+					d.Date = d.dd;
+					d.month = d.dd.getMonth();
+					d.day = d.dd.getDay();
+					d.MetricValue = +d.MetricValue;
+				});
+				
+				
+				var facts = crossfilter(data);
+				var all = facts.groupAll();
+				
+				/*USE THIS COMMAND TO CHECK FACT CONTENT
+				print_filter('facts')
+				*/
+				
+				//dimensions
+				var regionDimension = facts.dimension(function(d){return d.Region;});
+				var regionGroup = regionDimension.group().reduceSum(function(d){return d.MetricValue;});
+
+				var lobDimension = facts.dimension(function(d){return d.LOB;});
+				var lobGroup = lobDimension.group().reduceSum(function(d){return d.MetricValue;});
+				
+				var runDimension = facts.dimension(function(d){return [d.MetricName,d.Date];});
+				var runGroup = runDimension.group().reduceSum(function(d){return d.MetricValue;});
+
+				var dateDimension = facts.dimension(function(d){ return d.Date; });
+				var dateGroup = dateDimension.group().reduceSum(function(d){ return d.MetricValue; });
+				
+				var eventDimension = facts.dimension(function(d){return d.Event;})
+				var eventGroup = eventDimension.group().reduceSum(function(d){ return d.MetricValue; });
+				
+				var metricDimension = facts.dimension(function(d){return d.MetricName;})
+				var metricGroup = metricDimension.group().reduceSum(function(d){ return d.MetricValue; });
+				/*var metricArrayGroup = metricDimension.group().reduce(
+					  function(i,d){ i.push(d.MetricValue); return i; },
+					  function(i,d){ i.splice(i.indexOf(d.MetricValue),1); return i; },
+					  function(){ return []; }
+					);
+				*/
+				
+				//var dowDimension = facts.dimension(function(d){return d.day;})
+				var dowDimension = facts.dimension(function(d){return d.day + '.' + dow[d.day];})
+				var dowGroup = dowDimension.group().reduceSum(function(d){ return d.MetricValue; });
+				
+				var mthDimension = facts.dimension(function(d){return d.month + '.' + mths[d.month];})
+				var mthGroup = mthDimension.group().reduceSum(function(d){ return d.MetricValue; });
+				
+				var maxDate = dateDimension.top(1)[0].Date;
+				var minDate = dateDimension.bottom(1)[0].Date;
+				
+				
+				var select = dc.selectMenu('#selector')
+					.dimension(dateDimension)
+					.group(dateGroup)
+					;
+				
+				
+				var oldHandler = select.filterHandler();
+					select.filterHandler(function(dimension, filters) {
+						var parseFilters = filters.map(function(d) { return new Date(d);})
+					  oldHandler(dimension, parseFilters);
+					  return filters;
+					});
+				
+				
+				
+				var dataCount = dc.dataCount(".dc-data-count")
+					.dimension(facts)
+					.group(all)
+					.html({
+					some: '<strong>%filter-count</strong> of <strong>%total-count</strong> records | <a href="\javascript:dc.filterAll(); dc.renderAll();\">Reset All</a><p><ul><li>The framework is fast: In this simple example with ~25000 records the underlying data is filtered and charts updated in seconds.</li><li>The big value add for the end user is giving them the power to explore data across a wide range of dimensions</li><li>Data filtering can be applied by clicking on chart elements or zoom/brushing</li><li>What we need to set this up?: <ol><li>A webserver</li><li>A DB</li><li>A scheduler - to routintely copy out flat files from the DB</li><li>The requisite JavaScript/CSS/HTML files</li></ol></li></ul></p>',
+					all: 'All records selected. Please click on the graph to apply filters.<h1>Data Analysis with Visual Exploration  (PoC)</h1><p><ul><li>Simple & light weight visualization framework</li><li>Allows user to visually analyse data across multiple dimensions</li><li>Supports a wide range of chart types with extensive configurability</li><li>Suitable for rapid development/deployment</li><li>A simple single page dashboard can be coded in days</li></ul></p>'
+				  });
+
+				var dataTable = dc.dataTable("#table1")
+					.width(600)
+					.height(350)
+					.dimension(dateDimension)
+					.showGroups(false)
+					.size(3)
+					.group(function(d){ return d.month; })
+					.columns([{label:'Date',format: function(d){ return d.Date.getFullYear()+'-'+ mths[d.Date.getMonth()] + '-' +d.Date.getDate(); }},
+							//'Date',
+							'Region',
+							'LOB',
+							'Event',
+							'MetricName',
+							'MetricValue'])
+					.sortBy(function(d){ return d.Date; })
+					.order(d3.ascending)
+				;
+				
+				var volChart = dc.barChart("#range-chart")
+					.height(70)
+					.width(900)
+					.margins({top:10,bottom:30,right:10,left:70})
+					.dimension(dateDimension)
+					.group(dateGroup)
+					.x(d3.time.scale().domain([minDate,maxDate]));
+
+				volChart.yAxis().ticks(0).outerTickSize(0);
+				volChart.xAxis().ticks(4)
+				;
+				
+				var lineChart = dc.lineChart("#chart")
+					.width(850)
+					//.height(180)
+					.height(350)
+					//.brushOn(false)
+					.brushOn(true)
+					.elasticY(true)
+					.mouseZoomable(true)
+					//.rangeChart(volChart)
+					.margins({top:20,bottom:50,right:80,left:60})
+					//.margins({top:10,bottom:30,right:10,left:70})
+					.dimension(dateDimension)
+					.group(dateGroup,"Total Count")
+					.renderHorizontalGridLines(true)
+					.renderArea(true)
+					.legend(dc.legend().x(1200).y(5).itemHeight(12).gap(5))
+					.x(d3.time.scale().domain([minDate,maxDate]))
+					;
+
+				lineChart.yAxis().ticks(6);
+				lineChart.xAxis().ticks(4);
+				
+				
+				var pieChart1 = dc.pieChart("#pie1")
+					.width(400)
+					.height(350)
+					.radius(120)
+					.colors(d3.scale.category10())
+					.transitionDuration(1500) //speed of animation
+					.dimension(regionDimension)
+					.group(regionGroup)
+					.legend(dc.legend().x(300).y(5).itemHeight(12).gap(5))
+					;
+
+				var pieChart2 = dc.pieChart("#pie2")
+					.width(650)	
+					.height(370)
+					.radius(180)
+					.cx(450)
+					.colors(d3.scale.category10())
+					.transitionDuration(1500) //speed of animation
+					.dimension(lobDimension)
+					.group(lobGroup)
+					.legend(dc.legend().x(5).y(7).itemHeight(12).gap(3))
+					;
+				
+				
+				var dayOfWeekChart = dc.rowChart('#row-chart1')
+					//.width(400)
+					.height(250)
+					.margins({top: 20, left: 10, right: 10, bottom: 20})
+					.group(dowGroup)
+					.dimension(dowDimension)
+					.ordinalColors(['#3182bd', '#6baed6', '#9ecae1', '#c6dbef', '#dadaeb'])
+					.label(function (d) {return d.key.split('.')[1];})
+					.title(function (d) {return d.value;})
+					.elasticX(true)
+					.xAxis().ticks(4);
+				
+				var monthChart = dc.rowChart('#row-chart2')
+					//.width(400)
+					.height(250)
+					.margins({top: 20, left: 10, right: 10, bottom: 20})
+					.group(mthGroup)
+					.dimension(mthDimension)
+					.ordinalColors(['#3182bd', '#6baed6', '#9ecae1', '#c6dbef', '#dadaeb'])
+					.label(function (d) {return d.key.split('.')[1];})
+					.title(function (d) {return d.value;})
+					.elasticX(true)
+					.xAxis().ticks(4);
+
+				
+				/*var boxPlot = dc.boxPlot("#boxplot")
+					.width(1360)
+					.height(300)
+					.colors("red")
+					.margins({top:40,bottom:60,right:80,left:60})
+					.dimension(metricDimension)
+					.group(metricArrayGroup)
+					.y(d3.scale.linear().domain([0,100]))
+					.yAxis().ticks(5)
+					;
+				*/
+				
+				var barChart1 = dc.barChart("#barchart1")
+					.width(850)
+					.height(350)
+					.margins({top:20,bottom:50,right:80,left:60})
+					.dimension(eventDimension)
+					.group(eventGroup)
+					.x(d3.scale.ordinal())
+					.xUnits(dc.units.ordinal)
+					.elasticY(true)
+					//.outerPadding(0.05)
+					;
+					
+				barChart1.yAxis().ticks(5);
+					
+				var barChart2 = dc.barChart("#barchart2")
+					.width(850)
+					.height(300)
+					.margins({top:20,bottom:100,right:80,left:60})
+					.dimension(metricDimension)
+					.group(metricGroup)
+					.x(d3.scale.ordinal())
+					.xUnits(dc.units.ordinal)
+					.elasticY(true)
+					.outerPadding(0.05)
+					.on('renderlet',function(chart){chart.selectAll("g.x text").attr('transform',"translate(-20,50)rotate(310)");})
+					;
+				
+				barChart2.yAxis().ticks(5);
+				
+				dc.renderAll();
+
+			
+			});
+			
+		</script>
+	
+	
+	</body>
+	
+</html>
