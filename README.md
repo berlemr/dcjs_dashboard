@@ -7,7 +7,7 @@ The d3.csv import functionality will only work if the files are hosted. This can
 In windows o/s and in the absence of admin rights to set the system path you can do the following:
 
 - in cmd , cd to the local folder with the files to be hosted.
-- type in 'set path=<python path>
+- type in 'set path=C:\mypath\Python27\' where mypath is probably program files.
 - test by typing python and verifying that the python shell opens up.
 - now you can run python -mSimpleHTTPServer and then in the browser you can put in the local ip and specify port 8000.
 
